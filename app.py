@@ -172,6 +172,39 @@ st.markdown("""
         animation: fadeIn 0.5s ease-out;
     }
 
+    /* Scroll Buttons */
+    .scroll-buttons {
+        position: fixed;
+        right: 30px;
+        bottom: 30px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        z-index: 9999;
+    }
+
+    .scroll-btn {
+        background-color: #2C3E50;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        font-size: 20px;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        transition: all 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .scroll-btn:hover {
+        background-color: #34495E;
+        box-shadow: 0 6px 12px rgba(0,0,0,0.3);
+        transform: scale(1.1);
+    }
+
     /* Responsive Grid */
     @media (max-width: 768px) {
         .stats-container {
@@ -194,6 +227,78 @@ st.markdown("""
         }
     }
     </style>
+    """, unsafe_allow_html=True)
+
+# Add scroll functionality using Streamlit components
+st.markdown("""
+    <div class="scroll-buttons">
+        <button class="scroll-btn" id="scrollTopBtn" title="Scroll to Top">↑</button>
+        <button class="scroll-btn" id="scrollBottomBtn" title="Scroll to Bottom">↓</button>
+    </div>
+
+    <script>
+    // Wait for the page to load
+    window.addEventListener('load', function() {
+        const scrollTopBtn = window.parent.document.getElementById('scrollTopBtn');
+        const scrollBottomBtn = window.parent.document.getElementById('scrollBottomBtn');
+
+        if (scrollTopBtn) {
+            scrollTopBtn.addEventListener('click', function() {
+                window.parent.document.querySelector('section.main').scrollTo({
+                    top: 0,
+                    behavior: 'smooth'
+                });
+            });
+        }
+
+        if (scrollBottomBtn) {
+            scrollBottomBtn.addEventListener('click', function() {
+                const mainSection = window.parent.document.querySelector('section.main');
+                mainSection.scrollTo({
+                    top: mainSection.scrollHeight,
+                    behavior: 'smooth'
+                });
+            });
+        }
+    });
+
+    // Also add click handlers directly in the current context
+    document.addEventListener('DOMContentLoaded', function() {
+        const scrollTopBtn = document.getElementById('scrollTopBtn');
+        const scrollBottomBtn = document.getElementById('scrollBottomBtn');
+
+        if (scrollTopBtn) {
+            scrollTopBtn.onclick = function() {
+                // Try multiple approaches
+                const main = document.querySelector('section.main') || 
+                             window.parent.document.querySelector('section.main') ||
+                             document.querySelector('.main') ||
+                             window.parent.document.querySelector('.main');
+
+                if (main) {
+                    main.scrollTo({top: 0, behavior: 'smooth'});
+                } else {
+                    window.scrollTo({top: 0, behavior: 'smooth'});
+                }
+            };
+        }
+
+        if (scrollBottomBtn) {
+            scrollBottomBtn.onclick = function() {
+                const main = document.querySelector('section.main') || 
+                             window.parent.document.querySelector('section.main') ||
+                             document.querySelector('.main') ||
+                             window.parent.document.querySelector('.main');
+
+                if (main) {
+                    main.scrollTo({top: main.scrollHeight, behavior: 'smooth'});
+                } else {
+                    window.scrollTo({top: document.body.scrollHeight, behavior: 'smooth'});
+                }
+            };
+        }
+    });
+    </script>
     """, unsafe_allow_html=True)
 
 # --- 3. SIDEBAR WITH ENHANCED UI ---
@@ -549,127 +654,119 @@ elif page == "📋 Results":
         labels = results['labels']
         image = results['image']
 
-        # Header
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.markdown("# 📋 Analysis Results")
-            st.markdown("### AI-Powered Skin Condition Assessment")
-
+        # Classic Professional Header
+        st.markdown("# Analysis Results")
         st.markdown("---")
 
-        # Display the analyzed image
-        st.markdown("### Analyzed Image")
-        st.markdown('<div class="image-container">', unsafe_allow_html=True)
-        st.image(image, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        # Two-column layout: Image on left, Diagnosis on right
+        col_img, col_diag = st.columns([1, 1.5])
+
+        with col_img:
+            st.markdown("#### Analyzed Image")
+            st.image(image, width=350)
+
+        with col_diag:
+            st.markdown("#### Diagnosis")
+            st.markdown(f"""
+            <div style="background: #f8f9fa; border-left: 4px solid #2C3E50; padding: 20px; margin-top: 10px;">
+                <h3 style="color: #2C3E50; margin: 0 0 15px 0;">{condition}</h3>
+                <p style="color: #666; margin: 0; font-size: 1em;">
+                    <strong>Confidence Score:</strong> {score:.1f}%
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # Simple confidence bar
+            st.markdown("<div style='margin-top: 15px;'>", unsafe_allow_html=True)
+            st.progress(int(score))
+            st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
         disease_data = DISEASE_INFO[condition]
 
-        # Professional Result Header
+        # Description Section
+        st.markdown("### Description")
         st.markdown(f"""
-        <div style="background: white; border: 2px solid #2C3E50; border-radius: 8px; padding: 30px; margin: 20px 0;">
-            <h2 style="color: #2C3E50; margin: 0; text-align: center; font-weight: 600;">
-                Diagnosis: {condition}
-            </h2>
-            <p style="text-align: center; color: #666; margin-top: 15px; font-size: 1.1em;">
-                Confidence Level: <strong>{score:.2f}%</strong>
+        <div style="background: white; border: 1px solid #ddd; padding: 20px; border-radius: 4px;">
+            <p style="line-height: 1.7; color: #333; margin: 0; text-align: justify;">
+                {disease_data["info"]}
             </p>
         </div>
         """, unsafe_allow_html=True)
 
-        # Simple Progress Bar
-        st.progress(int(score))
+        st.markdown("<br>", unsafe_allow_html=True)
 
-        st.markdown("---")
-
-        # Professional two-column result details
-        res_col1, res_col2 = st.columns([1, 1])
-
-        with res_col1:
-            st.markdown("""
-            <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 25px; height: 100%;">
-                <h3 style="color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px;">
-                    Description
-                </h3>
-            """, unsafe_allow_html=True)
-            st.markdown(
-                f'<p style="line-height: 1.8; color: #333; text-align: justify;">{disease_data["info"]}</p>',
-                unsafe_allow_html=True)
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        with res_col2:
-            st.markdown("""
-            <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 25px; height: 100%;">
-                <h3 style="color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px;">
-                    Care & Treatment Tips
-                </h3>
-            """, unsafe_allow_html=True)
-
-            for i, tip in enumerate(disease_data['tips'], 1):
-                st.markdown(f"""
-                <div style="margin-bottom: 12px; padding: 10px; background: #f8f9fa; border-left: 3px solid #2C3E50; border-radius: 3px;">
-                    <p style="margin: 0; line-height: 1.6; color: #333;">• {tip}</p>
-                </div>
-                """, unsafe_allow_html=True)
-
-            st.markdown("</div>", unsafe_allow_html=True)
-
-        # Alternative Predictions
-        st.markdown("---")
-        st.markdown("### Alternative Possibilities")
-
-        top_3_idx = np.argsort(predictions)[-3:][::-1]
-
-        # Create a professional table-like display
+        # Treatment Recommendations
+        st.markdown("### Recommended Care & Treatment")
         st.markdown("""
-        <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 20px;">
+        <div style="background: white; border: 1px solid #ddd; padding: 20px; border-radius: 4px;">
         """, unsafe_allow_html=True)
 
-        for i, pred_idx in enumerate(top_3_idx, 1):
-            pred_condition = labels[pred_idx]
-            pred_score = predictions[pred_idx] * 100
-
-            border_style = "border-top: 1px solid #eee;" if i > 1 else ""
-
+        for i, tip in enumerate(disease_data['tips'], 1):
             st.markdown(f"""
-            <div style="padding: 15px 10px; {border_style} display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <span style="color: #666; font-size: 0.9em; margin-right: 10px;">#{i}</span>
-                    <strong style="color: #2C3E50; font-size: 1.05em;">{pred_condition}</strong>
-                </div>
-                <div style="text-align: right;">
-                    <strong style="color: #2C3E50; font-size: 1.1em;">{pred_score:.1f}%</strong>
-                </div>
-            </div>
+            <p style="margin: 0 0 12px 0; line-height: 1.6; color: #333;">
+                <strong>{i}.</strong> {tip}
+            </p>
             """, unsafe_allow_html=True)
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-        # Call to Action
-        st.markdown("---")
-        st.info(
-            "💡 **Recommendation:** For accurate diagnosis and appropriate treatment, please consult a qualified dermatologist. This AI analysis is for preliminary screening only.")
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Alternative Diagnoses
+        st.markdown("### Alternative Diagnoses")
+
+        top_3_idx = np.argsort(predictions)[-3:][::-1]
+
+        # Create three columns for the top 3 predictions
+        pred_cols = st.columns(3)
+
+        for i, pred_idx in enumerate(top_3_idx):
+            pred_condition = labels[pred_idx]
+            pred_score = predictions[pred_idx] * 100
+
+            with pred_cols[i]:
+                st.markdown(f"""
+                <div style="background: white; border: 1px solid #ddd; border-radius: 4px; padding: 20px; text-align: center; height: 100%;">
+                    <div style="color: #666; font-size: 0.9em; margin-bottom: 8px;">Rank #{i + 1}</div>
+                    <h4 style="color: #2C3E50; margin: 10px 0; font-size: 1.1em;">{pred_condition}</h4>
+                    <div style="color: #2C3E50; font-size: 1.5em; font-weight: bold; margin-top: 12px;">{pred_score:.1f}%</div>
+                    <div style="color: #888; font-size: 0.85em; margin-top: 5px;">Confidence</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # Medical Disclaimer
+        st.markdown("""
+        <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; border-radius: 4px;">
+            <p style="margin: 0; line-height: 1.6; color: #856404;">
+                <strong>⚠️ Medical Disclaimer:</strong> This analysis is for informational purposes only and should not replace 
+                professional medical advice. Please consult a board-certified dermatologist for accurate diagnosis and treatment.
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
 
         # Action Buttons
-        st.markdown("---")
-        col1, col2, col3 = st.columns([1, 1, 1])
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            if st.button("🔄 Analyze New Image", use_container_width=True):
+            if st.button("🔄 New Analysis", use_container_width=True):
                 st.session_state.analysis_complete = False
                 st.session_state.analysis_results = None
                 st.session_state.captured_image = None
                 st.rerun()
 
         with col2:
-            if st.button("📚 Learn More", use_container_width=True):
+            if st.button("📚 Knowledge Base", use_container_width=True):
                 st.session_state.analysis_complete = False
                 st.rerun()
 
         with col3:
-            if st.button("📊 View Statistics", use_container_width=True):
+            if st.button("📊 Statistics", use_container_width=True):
                 st.session_state.analysis_complete = False
                 st.rerun()
 
