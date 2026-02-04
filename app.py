@@ -202,11 +202,23 @@ with st.sidebar:
     st.markdown("### Smart Dermatology Assistant")
     st.markdown("---")
 
-    page = st.radio(
-        "**Navigation**",
-        ["🔬 AI Analyzer", "📚 Knowledge Base", "📊 Statistics", "ℹ️ About"],
-        label_visibility="collapsed"
-    )
+    # Show Results option only if analysis is complete
+    if 'analysis_complete' not in st.session_state:
+        st.session_state.analysis_complete = False
+
+    if st.session_state.analysis_complete:
+        page = st.radio(
+            "**Navigation**",
+            ["🔬 AI Analyzer", "📋 Results", "📚 Knowledge Base", "📊 Statistics", "ℹ️ About"],
+            label_visibility="collapsed",
+            index=1  # Auto-select Results page
+        )
+    else:
+        page = st.radio(
+            "**Navigation**",
+            ["🔬 AI Analyzer", "📚 Knowledge Base", "📊 Statistics", "ℹ️ About"],
+            label_visibility="collapsed"
+        )
 
     st.markdown("---")
 
@@ -306,39 +318,67 @@ if page == "🔬 AI Analyzer":
     </style>
     """, unsafe_allow_html=True)
 
-    # Equal-sized two-column layout
+    # Two-column layout for capture/upload options
     col_left, col_right = st.columns(2, gap="medium")
+
+    # Initialize session state for camera mode
+    if 'show_camera' not in st.session_state:
+        st.session_state.show_camera = False
+    if 'captured_image' not in st.session_state:
+        st.session_state.captured_image = None
 
     with col_left:
         st.markdown("""
         <div class="upload-header-card">
-            <h3>Camera Capture</h3>
+            <h3>📷 Camera Capture</h3>
         </div>
         """, unsafe_allow_html=True)
-        source = st.camera_input("", label_visibility="collapsed", key="camera_input")
+
+        if st.button("📸 Open Camera", use_container_width=True, key="open_camera_btn"):
+            st.session_state.show_camera = True
+            st.session_state.captured_image = None
+
+        # Show camera input only when button is clicked
+        if st.session_state.show_camera:
+            camera_photo = st.camera_input("Take a photo", label_visibility="collapsed", key="camera_input")
+            if camera_photo:
+                st.session_state.captured_image = camera_photo
+                st.session_state.show_camera = False
+                st.rerun()
+
+        # Display captured image preview
+        if st.session_state.captured_image and not st.session_state.show_camera:
+            st.success("✅ Photo captured successfully!")
+            if st.button("📸 Retake Photo", use_container_width=True, key="retake_btn"):
+                st.session_state.captured_image = None
+                st.session_state.show_camera = True
+                st.rerun()
 
     with col_right:
         st.markdown("""
         <div class="upload-header-card">
-            <h3>Upload Image</h3>
+            <h3>📁 Upload Image</h3>
         </div>
         """, unsafe_allow_html=True)
-        uploaded = st.file_uploader("", type=["jpg", "png", "jpeg"], label_visibility="collapsed", key="file_upload")
+        uploaded = st.file_uploader("Choose a file", type=["jpg", "png", "jpeg"], label_visibility="collapsed",
+                                    key="file_upload")
 
-    img_file = source if source else uploaded
+    # Initialize session state for analysis results
+    if 'analysis_complete' not in st.session_state:
+        st.session_state.analysis_complete = False
+    if 'analysis_results' not in st.session_state:
+        st.session_state.analysis_results = None
+
+    # Determine which image to use
+    img_file = st.session_state.captured_image if st.session_state.captured_image else uploaded
 
     if img_file:
         image = Image.open(img_file)
 
-        # Display image with custom styling
-        st.markdown('<div class="image-container">', unsafe_allow_html=True)
-        st.image(image, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        # Validate image
+        # Validate image (don't display it)
         validation = is_valid_skin_image(image)
 
-        # Show validation metrics
+        # Show validation metrics ONLY
         st.markdown("### 📊 Image Quality Analysis")
         qual_col1, qual_col2, qual_col3 = st.columns(3)
 
@@ -409,95 +449,18 @@ if page == "🔬 AI Analyzer":
                     progress_bar.empty()
                     status_text.empty()
 
-                    # Display Results in Professional Format
-                    st.markdown("---")
+                    # Store results in session state
+                    st.session_state.analysis_results = {
+                        'condition': condition,
+                        'score': score,
+                        'predictions': predictions,
+                        'labels': labels,
+                        'image': image
+                    }
+                    st.session_state.analysis_complete = True
 
-                    disease_data = DISEASE_INFO[condition]
-
-                    # Professional Result Header
-                    st.markdown(f"""
-                    <div style="background: white; border: 2px solid #2C3E50; border-radius: 8px; padding: 30px; margin: 20px 0;">
-                        <h2 style="color: #2C3E50; margin: 0; text-align: center; font-weight: 600;">
-                            Diagnosis: {condition}
-                        </h2>
-                        <p style="text-align: center; color: #666; margin-top: 15px; font-size: 1.1em;">
-                            Confidence Level: <strong>{score:.2f}%</strong>
-                        </p>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    # Simple Progress Bar
-                    st.progress(int(score))
-
-                    st.markdown("---")
-
-                    # Professional two-column result details
-                    res_col1, res_col2 = st.columns([1, 1])
-
-                    with res_col1:
-                        st.markdown("""
-                        <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 25px; height: 100%;">
-                            <h3 style="color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px;">
-                                Description
-                            </h3>
-                        """, unsafe_allow_html=True)
-                        st.markdown(
-                            f'<p style="line-height: 1.8; color: #333; text-align: justify;">{disease_data["info"]}</p>',
-                            unsafe_allow_html=True)
-                        st.markdown("</div>", unsafe_allow_html=True)
-
-                    with res_col2:
-                        st.markdown("""
-                        <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 25px; height: 100%;">
-                            <h3 style="color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px;">
-                                Care & Treatment Tips
-                            </h3>
-                        """, unsafe_allow_html=True)
-
-                        for i, tip in enumerate(disease_data['tips'], 1):
-                            st.markdown(f"""
-                            <div style="margin-bottom: 12px; padding: 10px; background: #f8f9fa; border-left: 3px solid #2C3E50; border-radius: 3px;">
-                                <p style="margin: 0; line-height: 1.6; color: #333;">• {tip}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                        st.markdown("</div>", unsafe_allow_html=True)
-
-                    # Alternative Predictions
-                    st.markdown("---")
-                    st.markdown("### Alternative Possibilities")
-
-                    top_3_idx = np.argsort(predictions)[-3:][::-1]
-
-                    # Create a professional table-like display
-                    st.markdown("""
-                    <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 20px;">
-                    """, unsafe_allow_html=True)
-
-                    for i, pred_idx in enumerate(top_3_idx, 1):
-                        pred_condition = labels[pred_idx]
-                        pred_score = predictions[pred_idx] * 100
-
-                        border_style = "border-top: 1px solid #eee;" if i > 1 else ""
-
-                        st.markdown(f"""
-                        <div style="padding: 15px 10px; {border_style} display: flex; justify-content: space-between; align-items: center;">
-                            <div>
-                                <span style="color: #666; font-size: 0.9em; margin-right: 10px;">#{i}</span>
-                                <strong style="color: #2C3E50; font-size: 1.05em;">{pred_condition}</strong>
-                            </div>
-                            <div style="text-align: right;">
-                                <strong style="color: #2C3E50; font-size: 1.1em;">{pred_score:.1f}%</strong>
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                    st.markdown("</div>", unsafe_allow_html=True)
-
-                    # Call to Action
-                    st.markdown("---")
-                    st.info(
-                        "💡 **Recommendation:** For accurate diagnosis and appropriate treatment, please consult a qualified dermatologist. This AI analysis is for preliminary screening only.")
+                    # Switch to results page
+                    st.rerun()
 
         else:
             # Professional error message with suggestions
@@ -526,7 +489,7 @@ if page == "🔬 AI Analyzer":
         <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 30px; margin: 20px 0;">
             <h3 style="color: #2C3E50; margin-bottom: 20px;">Instructions for Use</h3>
             <ol style="line-height: 2; color: #333;">
-                <li><strong>Image Capture/Upload:</strong> Take a photo using your camera or upload an existing image from your device</li>
+                <li><strong>Image Capture/Upload:</strong> Click "Open Camera" to take a photo or upload an existing image from your device</li>
                 <li><strong>Image Quality:</strong> Ensure adequate lighting and clear focus on the affected skin area</li>
                 <li><strong>Analysis:</strong> Click the "Analyze Image" button to process the image through our AI model</li>
                 <li><strong>Results Review:</strong> Review the diagnosis, confidence level, and recommended care guidelines</li>
@@ -574,7 +537,151 @@ if page == "🔬 AI Analyzer":
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- PAGE 2: PROFESSIONAL KNOWLEDGE BASE ---
+# --- PAGE 2: RESULTS PAGE ---
+elif page == "📋 Results":
+    st.markdown('<div class="fade-in">', unsafe_allow_html=True)
+
+    if st.session_state.analysis_complete and st.session_state.analysis_results:
+        results = st.session_state.analysis_results
+        condition = results['condition']
+        score = results['score']
+        predictions = results['predictions']
+        labels = results['labels']
+        image = results['image']
+
+        # Header
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.markdown("# 📋 Analysis Results")
+            st.markdown("### AI-Powered Skin Condition Assessment")
+
+        st.markdown("---")
+
+        # Display the analyzed image
+        st.markdown("### Analyzed Image")
+        st.markdown('<div class="image-container">', unsafe_allow_html=True)
+        st.image(image, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("---")
+
+        disease_data = DISEASE_INFO[condition]
+
+        # Professional Result Header
+        st.markdown(f"""
+        <div style="background: white; border: 2px solid #2C3E50; border-radius: 8px; padding: 30px; margin: 20px 0;">
+            <h2 style="color: #2C3E50; margin: 0; text-align: center; font-weight: 600;">
+                Diagnosis: {condition}
+            </h2>
+            <p style="text-align: center; color: #666; margin-top: 15px; font-size: 1.1em;">
+                Confidence Level: <strong>{score:.2f}%</strong>
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Simple Progress Bar
+        st.progress(int(score))
+
+        st.markdown("---")
+
+        # Professional two-column result details
+        res_col1, res_col2 = st.columns([1, 1])
+
+        with res_col1:
+            st.markdown("""
+            <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 25px; height: 100%;">
+                <h3 style="color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px;">
+                    Description
+                </h3>
+            """, unsafe_allow_html=True)
+            st.markdown(
+                f'<p style="line-height: 1.8; color: #333; text-align: justify;">{disease_data["info"]}</p>',
+                unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        with res_col2:
+            st.markdown("""
+            <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 25px; height: 100%;">
+                <h3 style="color: #2C3E50; border-bottom: 2px solid #2C3E50; padding-bottom: 10px; margin-bottom: 20px;">
+                    Care & Treatment Tips
+                </h3>
+            """, unsafe_allow_html=True)
+
+            for i, tip in enumerate(disease_data['tips'], 1):
+                st.markdown(f"""
+                <div style="margin-bottom: 12px; padding: 10px; background: #f8f9fa; border-left: 3px solid #2C3E50; border-radius: 3px;">
+                    <p style="margin: 0; line-height: 1.6; color: #333;">• {tip}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+            st.markdown("</div>", unsafe_allow_html=True)
+
+        # Alternative Predictions
+        st.markdown("---")
+        st.markdown("### Alternative Possibilities")
+
+        top_3_idx = np.argsort(predictions)[-3:][::-1]
+
+        # Create a professional table-like display
+        st.markdown("""
+        <div style="background: white; border: 1px solid #ddd; border-radius: 5px; padding: 20px;">
+        """, unsafe_allow_html=True)
+
+        for i, pred_idx in enumerate(top_3_idx, 1):
+            pred_condition = labels[pred_idx]
+            pred_score = predictions[pred_idx] * 100
+
+            border_style = "border-top: 1px solid #eee;" if i > 1 else ""
+
+            st.markdown(f"""
+            <div style="padding: 15px 10px; {border_style} display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <span style="color: #666; font-size: 0.9em; margin-right: 10px;">#{i}</span>
+                    <strong style="color: #2C3E50; font-size: 1.05em;">{pred_condition}</strong>
+                </div>
+                <div style="text-align: right;">
+                    <strong style="color: #2C3E50; font-size: 1.1em;">{pred_score:.1f}%</strong>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Call to Action
+        st.markdown("---")
+        st.info(
+            "💡 **Recommendation:** For accurate diagnosis and appropriate treatment, please consult a qualified dermatologist. This AI analysis is for preliminary screening only.")
+
+        # Action Buttons
+        st.markdown("---")
+        col1, col2, col3 = st.columns([1, 1, 1])
+
+        with col1:
+            if st.button("🔄 Analyze New Image", use_container_width=True):
+                st.session_state.analysis_complete = False
+                st.session_state.analysis_results = None
+                st.session_state.captured_image = None
+                st.rerun()
+
+        with col2:
+            if st.button("📚 Learn More", use_container_width=True):
+                st.session_state.analysis_complete = False
+                st.rerun()
+
+        with col3:
+            if st.button("📊 View Statistics", use_container_width=True):
+                st.session_state.analysis_complete = False
+                st.rerun()
+
+    else:
+        st.warning("No analysis results available. Please analyze an image first.")
+        if st.button("Go to AI Analyzer", use_container_width=True):
+            st.session_state.analysis_complete = False
+            st.rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# --- PAGE 3: PROFESSIONAL KNOWLEDGE BASE ---
 elif page == "📚 Knowledge Base":
     st.markdown('<div class="fade-in">', unsafe_allow_html=True)
 
@@ -696,7 +803,7 @@ elif page == "📚 Knowledge Base":
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- PAGE 3: STATISTICS PAGE ---
+# --- PAGE 4: STATISTICS PAGE ---
 elif page == "📊 Statistics":
     st.markdown('<div class="fade-in">', unsafe_allow_html=True)
 
@@ -776,7 +883,7 @@ elif page == "📊 Statistics":
 
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- PAGE 4: ENHANCED ABOUT ---
+# --- PAGE 5: ENHANCED ABOUT ---
 elif page == "ℹ️ About":
     st.markdown('<div class="fade-in">', unsafe_allow_html=True)
 
